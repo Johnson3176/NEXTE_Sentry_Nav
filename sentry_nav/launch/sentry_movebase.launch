@@ -9,7 +9,7 @@
         <rosparam file="$(find sentry_nav)/param/costmap_common_params.yaml" command="load" ns="local_costmap" />
         <rosparam file="$(find sentry_nav)/param/local_costmap_params.yaml" command="load" />
         <rosparam file="$(find sentry_nav)/param/global_costmap_params.yaml" command="load" />
-        <rosparam file="$(find sentry_nav)/param/base_local_planner_params.yaml" command="load" />
+        <rosparam file="$(find sentry_nav)/param/base_teb_local_planner_params.yaml" command="load" />
         <!-- <rosparam file="$(find sentry_nav)/param/global_planner_params.yaml" command="load" /> -->
     </node>
 
