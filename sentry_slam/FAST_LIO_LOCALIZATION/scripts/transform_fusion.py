@@ -3,7 +3,8 @@
 from __future__ import print_function, division, absolute_import
 
 import copy
-import _thread
+# import _thread
+import threading  # 引入线程锁
 import time
 
 import numpy as np
@@ -15,7 +16,7 @@ from nav_msgs.msg import Odometry
 
 cur_odom_to_baselink = None
 cur_map_to_odom = None
-
+data_lock = threading.Lock()
 
 def pose_to_mat(pose_msg):
     return np.matmul(
@@ -28,20 +29,23 @@ def transform_fusion():
     global cur_odom_to_baselink, cur_map_to_odom
 
     br = tf.TransformBroadcaster()
-    while True:
-        time.sleep(1 / FREQ_PUB_LOCALIZATION)
 
-        # TODO 这里注意线程安全
-        cur_odom = copy.copy(cur_odom_to_baselink)
-        if cur_map_to_odom is not None:
-            T_map_to_odom = pose_to_mat(cur_map_to_odom)
+    rate = rospy.Rate(FREQ_PUB_LOCALIZATION)
+    while not rospy.is_shutdown():
+        # 使用线程锁安全地复制数据
+        with data_lock:
+            cur_odom = copy.copy(cur_odom_to_baselink)
+            local_map_to_odom = copy.copy(cur_map_to_odom)
+
+        if local_map_to_odom is not None:
+            T_map_to_odom = pose_to_mat(local_map_to_odom)
         else:
             T_map_to_odom = np.eye(4)
 
         br.sendTransform(tf.transformations.translation_from_matrix(T_map_to_odom),
                          tf.transformations.quaternion_from_matrix(T_map_to_odom),
                          rospy.Time.now(),
-                         'camera_init', 'map')
+                         'odom', 'map')
         if cur_odom is not None:
             # 发布全局定位的odometry
             localization = Odometry()
@@ -58,16 +62,18 @@ def transform_fusion():
             localization.child_frame_id = 'body'
             # rospy.loginfo_throttle(1, '{}'.format(np.matmul(T_map_to_odom, T_odom_to_base_link)))
             pub_localization.publish(localization)
-
+        rate.sleep()
 
 def cb_save_cur_odom(odom_msg):
     global cur_odom_to_baselink
-    cur_odom_to_baselink = odom_msg
+    with data_lock:
+        cur_odom_to_baselink = odom_msg
 
 
 def cb_save_map_to_odom(odom_msg):
     global cur_map_to_odom
-    cur_map_to_odom = odom_msg
+    with data_lock:
+        cur_map_to_odom = odom_msg
 
 
 if __name__ == '__main__':
@@ -83,6 +89,9 @@ if __name__ == '__main__':
     pub_localization = rospy.Publisher('/localization', Odometry, queue_size=1)
 
     # 发布定位消息
-    _thread.start_new_thread(transform_fusion, ())
+    t = threading.Thread(target=transform_fusion)
+    t.daemon = True
+    t.start()
+
 
     rospy.spin()
