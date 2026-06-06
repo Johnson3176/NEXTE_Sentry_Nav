@@ -256,7 +256,7 @@ This repository utilizes the open-source `move_base` framework for path planning
 - `/Laserscans`: 2D point cloud data in the robot's coordinate frame.
 - `/tf`: The following frames must be included in the TF tree:
   - `/map`: 2D grid map coordinate frame (named `map` in this repository).
-  - `/odom`: Odometry frame (named `camera_init` in this repository).
+  - `/odom`: Odometry frame (named `odom` in this repository).
   - `/base_link`: Robot's coordinate frame (named `body_2d` in this repository).
   - **Tip:** To check if the TF tree is correct, open `rqt` and use the TF tree plugin.
 - `/map`: This is not a coordinate frame but the grid map information published by `map_server`.
@@ -395,10 +395,10 @@ If an error occurs when running directly, pay attention to the error message, et
 <br>
 Here is a little explanation of the tf tree
 
-- map->camera_init: tf conversion is published by relocation icp. If the odometer is used directly for positioning, it is statically published by static_transform_publisher.
+- map->odom: tf conversion is published by relocation icp. If the odometer is used directly for positioning, it is statically published by static_transform_publisher.
 - cmera_init->robot_foot_init: statically published by static_transform_publisher, which is the conversion from mid360 to the robot foot. Robot_foot_init means the initial position of the robot foot
-- camera_init->body: published by the odometer information of fast_lio, which is the initial position of the radar and the relationship to the current position of the radar
-- body->body_foot: the main function is to convert the radar position to the robot foot, which is also statically published
+- odom->body: published by the odometer information of fast_lio, which is the initial position of the radar and the relationship to the current position of the radar
+- body->base_link: the main function is to convert the radar position to the robot foot, which is also statically published
 - map->body_2d: published by Trans_body_2d.cpp, the main function is to project the body onto the 2dmap
 
 ## Subsequent optimization or modification

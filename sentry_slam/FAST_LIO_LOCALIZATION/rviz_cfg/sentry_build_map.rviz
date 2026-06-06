@@ -402,7 +402,7 @@ Visualization Manager:
       Length: 1
       Name: Axes
       Radius: 0.10000000149011612
-      Reference Frame: camera_init
+      Reference Frame: odom
       Show Trail: false
       Value: false
     - Alpha: 1
@@ -434,7 +434,7 @@ Visualization Manager:
           Value: true
         body_foot:
           Value: true
-        camera_init:
+        odom:
           Value: true
         robot_foot_init:
           Value: true
@@ -445,7 +445,7 @@ Visualization Manager:
       Show Axes: true
       Show Names: true
       Tree:
-        camera_init:
+        odom:
           body:
             body_foot:
               {}

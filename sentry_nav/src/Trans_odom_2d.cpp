@@ -20,7 +20,7 @@ void callback(const nav_msgs::Odometry& odom)
     // ROS_INFO("The augular velocity: roll=%f, pitch=%f, yaw=%f\n",cmd_vel.angular.x, cmd_vel.angular.y, cmd_vel.angular.z);
     // put the data in union
     odom_2d.header.stamp = ros::Time::now();
-    odom_2d.header.frame_id = "camera_init_2d";
+    odom_2d.header.frame_id = "odom_2d";
     odom_2d.child_frame_id = "map";
 
     odom_2d.pose.pose.position.x = odom.pose.pose.position.x;

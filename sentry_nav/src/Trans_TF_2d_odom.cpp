@@ -18,7 +18,7 @@ int main(int argc, char** argv){
     tf::StampedTransform transform_listener;
     
     try{
-      listener.lookupTransform("map", "camera_init",  
+      listener.lookupTransform("map", "odom",  
                                ros::Time(0), transform_listener);
     }
     catch (tf::TransformException ex){
@@ -35,7 +35,7 @@ int main(int argc, char** argv){
 
     transform_broadcaster.setOrigin( tf::Vector3(robot_pose_x, robot_pose_y, 0.0) );
     transform_broadcaster.setRotation( tf::Quaternion(0, 0, robot_oriation_z, robot_oriation_w) );
-    broadcaster.sendTransform(tf::StampedTransform(transform_broadcaster, ros::Time::now(), "map", "camera_init_2d"));
+    broadcaster.sendTransform(tf::StampedTransform(transform_broadcaster, ros::Time::now(), "map", "odom_2d"));
     
 
     rate.sleep();

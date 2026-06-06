@@ -6,7 +6,7 @@ controller_patience:  15.0        # 15.0
 DWAPlannerROS:
   # General Parameters
   holonomic_robot: false
-  global_frame_id: camera_init
+  global_frame_id: odom
   odom_topic: Odometry
   publish_traj_pc : true
   publish_cost_grid_pc: false           # false

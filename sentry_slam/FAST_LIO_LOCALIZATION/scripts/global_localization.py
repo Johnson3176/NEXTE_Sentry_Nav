@@ -183,7 +183,7 @@ def cb_save_cur_odom(odom_msg):
 def cb_save_cur_scan(pc_msg):
     global cur_scan
     # 注意这里fastlio直接将scan转到odom系下了 不是lidar局部系
-    pc_msg.header.frame_id = 'camera_init'
+    pc_msg.header.frame_id = 'odom'
     pc_msg.header.stamp = rospy.Time().now()
     pub_pc_in_map.publish(pc_msg)
 

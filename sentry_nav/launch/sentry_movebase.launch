@@ -1,10 +1,10 @@
 <launch>
     <node pkg="move_base" type="move_base" respawn="false" name="move_base1" output="screen" clear_params="true" args="/map:=prior_map /odom:=Odometry">
         <!-- <remap from="/cmd_vel" to="/raw_cmd_vel" /> -->
+        <param name="recovery_behavior_enabled" value="false" />
 
         <param name="base_global_planner" value="hybrid_astar_planner/HybridAStarPlanner" />
         <param name="use_hybrid_astar" value="true" />
-        <param name="recovery_behavior_enabled" value="true" />
         <rosparam file="$(find sentry_nav)/param/costmap_common_params.yaml" command="load" ns="global_costmap" />
         <rosparam file="$(find sentry_nav)/param/costmap_common_params.yaml" command="load" ns="local_costmap" />
         <rosparam file="$(find sentry_nav)/param/local_costmap_params.yaml" command="load" />

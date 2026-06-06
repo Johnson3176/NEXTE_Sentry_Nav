@@ -1,11 +1,11 @@
 TebLocalPlannerROS:
 
-  map_frame: camera_init          # 注意：建议改为 odom，原先的 camera_init 容易因视觉标定漂移导致控制抖动
+  map_frame: odom          # 注意：建议改为 odom，原先的 odom 容易因视觉标定漂移导致控制抖动
   odom_topic: Odometry
   # odom_topic: odom
   # map_frame: /odom
   
-  transform_tolerance: 0.2
+  transform_tolerance: 0.5
 
   # Trajectory
 

@@ -262,7 +262,7 @@ output: `body_2d` frame，即机器人在二维栅格地图坐标系下的位姿
 - `/Laserscans`, 机器人坐标系的2维点云数据，
 - `/tf`, tf中需要至少包含以下坐标系
   - `/map`, 二维栅格地图坐标系, 在我的源码中名字为`map`
-  - `/odom`, 机器人里程计坐标系, 在我的源码中名字为`camera_init`
+  - `/odom`, 机器人里程计坐标系, 在我的源码中名字为`odom`
   - `/base_link`, 机器人坐标系, 在我的源码中名字为`body_2d`
   - PS: 如何看自己的坐标系是否正确呢？终端输入rqt，打开插件中的tf tree就能看到
 - `/map`,  这个/map不是坐标系信息，而是使用map_server发布的栅格地图信息
@@ -387,10 +387,10 @@ roslaunch sentry_serial sentry_serial.launch
 <br>
 这里对于tf树做一点说明
 
- - map->camera_init：tf转换由重定位icp发布，如果直接使用里程计定位，则是由static_transform_publisher静态发布。
+ - map->odom：tf转换由重定位icp发布，如果直接使用里程计定位，则是由static_transform_publisher静态发布。
  - cmera_init->robot_foot_init：由static_transform_publisher静态发布，这样作用是mid360到机器人足端的转换，robot_foot_init意味着机器人足端的初始位姿
- - camera_init->body：由fast_lio的里程计信息发布，就是雷达的初始位姿，到雷达当前位姿的关系
- - body->body_foot：主要作用是将雷达的位姿转换到机器人足端，也是静态发布
+ - odom->body：由fast_lio的里程计信息发布，就是雷达的初始位姿，到雷达当前位姿的关系
+ - body->base_link：主要作用是将雷达的位姿转换到机器人底盘中心，也是静态发布
  - map->body_2d：由Trans_body_2d.cpp发布，主要作用是将body投影到2dmap上
 
 ## 后续优化或修改
