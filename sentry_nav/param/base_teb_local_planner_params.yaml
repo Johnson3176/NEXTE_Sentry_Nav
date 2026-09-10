@@ -1,112 +1,144 @@
-TebLocalPlannerROS:
+controller_frequency: 20          # 20.0
+controller_patience:  15.0        # 15.0
 
+recovery_behavior_enabled: False
+
+TebLocalPlannerROS:
   map_frame: odom          # 注意：建议改为 odom，原先的 odom 容易因视觉标定漂移导致控制抖动
   odom_topic: Odometry
-  # odom_topic: odom
-  # map_frame: /odom
-  
-  transform_tolerance: 0.5
+  # v0.1: 仅发布已选中 TEB 轨迹的已加权约束代价；不改变优化权重或速度指令。
+  # 回滚：设为 False 后停止额外统计与话题发布。
+  publish_constraint_cost: True
 
-  # Trajectory
 
-  teb_autosize: True
-  dt_ref: 0.1 #期望的轨迹时间分辨率
-  dt_hysteresis: 0.01 #根据当前时间分辨率自动调整大小的滞后现象，通常约为。建议使用dt ref的10%
-  
-  global_plan_overwrite_orientation: True #覆盖由全局规划器提供的局部子目标的方向
-  max_global_plan_lookahead_dist: 3.0 #指定考虑优化的全局计划子集的最大长度
-  feasibility_check_no_poses: 4 #每个采样间隔的姿态可行性分析数，default：4
-  
+  # ################ GoalTolerance ################
+  xy_goal_tolerance: 0.05
+  yaw_goal_tolerance: 0.05
+  free_goal_vel: False  # 控制到目标点的速度为0
+  # trans_stopped_vel: 0.1
+  # theta_stopped_vel: 0.1
 
-  allow_init_with_backwards_motion: True
-  global_plan_viapoint_sep: -1
-  global_plan_prune_distance: 1
-  exact_arc_length: False
-  publish_feedback: False
 
-  # Robot
-  max_vel_x: 5
-  max_vel_x_backwards: 2
-  max_vel_theta: 1
-  acc_lim_x: 3
-  acc_lim_theta: 1
-
-  #仅适用于全向轮
-  # max_vel_y (double, default: 0.0)  
-  # acc_lim_y (double, default: 0.5)
-
+  # ################ Robot ################
+  max_vel_x: 1.2
+  max_vel_x_backwards: 0.4
+  max_vel_theta: 1.0
+  acc_lim_x: 1.0
+  acc_lim_theta: 1.0
+  transform_tolerance: 0.2
   # ********************** Carlike robot parameters ********************
   min_turning_radius: 0.0       #【修改】设为 0.0。代表机器人拥有原地自旋（自转半径为0）的能力！ Min turning radius of the carlike robot (compute value using a model or adjust with rqt_reconfigure manually)
   wheelbase: 0.0                 # 【修改】设为 0.0。差速模型不需要轴距 Wheelbase of our robot
   cmd_angle_instead_rotvel: False # 【修改】设为 False！底盘需要接收正常的角速度(rad/s)，而不是前轮偏转角！ stage simulator takes the angle instead of the rotvel as input (twist message)
   # ********************************************************************
-
   footprint_model: # types: "point", "circular", "two_circles", "line", "polygon"
-    type: "line"
-    # radius: 0.2 # for type "circular"
-    line_start: [-0.2, 0.0] # for type "line"
-    line_end: [0.2, 0.0] # for type "line"
-    # front_offset: 0.2 # for type "two_circles"
-    # front_radius: 0.2 # for type "two_circles"
-    # rear_offset: 0.2 # for type "two_circles"
-    # rear_radius: 0.2 # for type "two_circles"
-    # vertices: [ [0.25, -0.05], [0.18, -0.05], [0.18, -0.18], [-0.19, -0.18], [-0.25, 0], [-0.19, 0.18], [0.18, 0.18], [0.18, 0.05], [0.25, 0.05] ] # for type "polygon"
+    # type: "line"
+    type: "polygon"
+    # line_start: [-0.2, 0.0] # for type "line"
+    # line_end: [0.2, 0.0] # for type "line"
+    vertices: [[0.5, 0.4], [-0.5, 0.4], [-0.5, -0.4], [0.5, -0.4]]
 
-  # GoalTolerance
-      
-  xy_goal_tolerance: 0.2
-  yaw_goal_tolerance: 0.1
-  free_goal_vel: False
-  # complete_global_plan: True   
+
+  # ################ Trajectory ################
+  teb_autosize: True
+  dt_ref: 0.3  # 期望的轨迹时间分辨率  0.2时规划比较流畅
+  dt_hysteresis: 0.03  # 根据当前时间分辨率自动调整大小的滞后现象，通常约为。建议使用dt ref的10%
+  global_plan_overwrite_orientation: True # 覆盖由全局规划器路径点的方向
+  allow_init_with_backwards_motion: False
+  complete_global_plan: False
+  max_global_plan_lookahead_dist: 3.0  # 指定考虑优化的全局计划子集的最大长度
+  global_plan_prune_distance: 1.0  #
+  force_reinit_new_goal_dist: 1.0
+  force_reinit_new_goal_angular: 0.78
+  feasibility_check_no_poses: 5 #每个采样间隔的姿态可行性分析数，default：4
+  feasibility_check_lookahead_distance: -1.0
+  exact_arc_length: False  # 一般用true. 如果为true，则在速度，加速度和转弯速率计算中使用精确的弧长(计算三角函数，会增加cpu负担)，否则使用两个位姿点的直线距离做近似。
+  publish_feedback: False  # 发布包含完整轨迹和活动障碍物的反馈，在可视化部分
+  control_look_ahead_poses: 2
+  prevent_look_ahead_poses_near_goal: 5
+  min_samples: 8
+  max_samples: 15
+  # ViaPoints
+  global_plan_viapoint_sep: -1 # [-0.1, 5.0] 正数才启用。调整全局路径上选取的航迹点的间隔，应根据机器人的尺寸大小调整.
+  via_points_ordered: False
+
+
   # Obstacles
-      
-  min_obstacle_dist: 0.1 #0.3 # 与障碍的最小期望距离,注意，teb_local_planner本身不考虑膨胀半径
-  include_costmap_obstacles: True #应否考虑到局部costmap的障碍
+  min_obstacle_dist: 0.1  # 0.3 # 与障碍的最小期望距离,注意，teb_local_planner本身不考虑膨胀半径
+  inflation_dist: 0.10
+  include_costmap_obstacles: False #应否考虑到局部costmap的障碍
+  include_dynamic_obstacles: True
+  dynamic_obstacle_inflation_dist: 0.10
   costmap_obstacles_behind_robot_dist: 0.3 #考虑后面n米内的障碍物
-  obstacle_poses_affected: 30 #为了保持距离，每个障碍物位置都与轨道上最近的位置相连。
-  costmap_converter_plugin: ""
-  costmap_converter_spin_thread: True
-  costmap_converter_rate: 5
+  obstacle_poses_affected: 5 #为了保持距离，每个障碍物位置都与轨道上最近的位置相连。
+  legacy_obstacle_association: False
+  obstacle_association_force_inclusion_factor: 1.5
+  obstacle_association_cutoff_factor: 5.0
+  obstacle_proximity_ratio_max_vel: 0.80
+  obstacle_proximity_lower_bound: 0.35
+  obstacle_proximity_upper_bound: 0.75
+  costmap_converter_plugin: "costmap_converter::CostmapToLinesDBSRANSAC" 
+ 
+  # Configure plugins (namespace move_base/costmap_to_lines or move_base/costmap_to_polygons)
+  # costmap_converter/CostmapToLinesDBSRANSAC, costmap_converter/CostmapToLinesDBSMCCH, costmap_converter/CostmapToPolygonsDBSMCCH
+  costmap_converter/CostmapToLinesDBSRANSAC:
+    cluster_max_distance: 0.3 #default:0.4
+    cluster_min_pts: 3 #default:2
+    ransac_inlier_distance: 0.1    #0.15
+    ransac_min_inliers: 8       #10
+    ransac_no_iterations: 100 #default:1500
+    ransac_remainig_outliers: 3
+    ransac_convert_outlier_pts: True
+    ransac_filter_remaining_outlier_pts: False
+    convex_hull_min_pt_separation: 0.15     #0.1
 
   # Optimization
-      
-  no_inner_iterations: 5
-  no_outer_iterations: 4
+  no_inner_iterations: 3
+  no_outer_iterations: 2
   optimization_activate: True
   optimization_verbose: False
   penalty_epsilon: 0.1
   weight_max_vel_x: 2
   weight_max_vel_theta: 1
-  weight_acc_lim_x: 1
-  weight_acc_lim_theta: 1
+  weight_acc_lim_x: 5
+  weight_acc_lim_theta: 4
   weight_kinematics_nh: 1000
-  weight_kinematics_forward_drive: 1
+  weight_kinematics_forward_drive: 8
   weight_kinematics_turning_radius: 1
-  weight_optimaltime: 1
-  weight_obstacle: 50
-  weight_dynamic_obstacle: 10 # not in use yet
+  weight_optimaltime: 0.7
+  weight_obstacle: 20
+  weight_inflation: 0.8
+  weight_dynamic_obstacle: 20 
+  weight_dynamic_obstacle_inflation: 0.8
+  weight_velocity_obstacle_ratio: 3
   alternative_time_cost: False # not in use yet
   selection_alternative_time_cost: False
-  # Homotopy Class Planner
 
-  enable_homotopy_class_planning: False
-  enable_multithreading: False
-  simple_exploration: False
-  max_number_classes: 4
-  roadmap_graph_no_samples: 15
+  # Homotopy Class Planning
+  enable_homotopy_class_planning: True
+  enable_multithreading: True
+  max_number_classes: 2
+  max_number_plans_in_current_class: 4
+  selection_cost_hysteresis: 1.5
+  selection_prefer_initial_plan: 1.0
+  selection_obst_cost_scale: 5.0
+  selection_viapoint_cost_scale: 1.0
+  selection_dropping_probability: 0.0
+  switching_blocking_period: 3.5
+  roadmap_graph_no_samples: 10
   roadmap_graph_area_width: 5
   h_signature_prescaler: 0.5
   h_signature_threshold: 0.1
-  obstacle_keypoint_offset: 0.1
+  obstacle_keypoint_offset: 0.60
   obstacle_heading_threshold: 0.45
-  visualize_hc_graph: False
+  visualize_hc_graph: True
+  simple_exploration: True
 
-  # # Recovery
-
-  # shrink_horizon_backup: True
-  # shrink_horizon_min_duration: 10
-  # oscillation_recovery: True
-  # oscillation_v_eps: 0.1
-  # oscillation_omega_eps: 0.1
-  # oscillation_recovery_min_duration: 10
-  # oscillation_filter_duration: 10
+  # Recovery
+  shrink_horizon_backup: True
+  shrink_horizon_min_duration: 10
+  oscillation_recovery: True
+  oscillation_v_eps: 0.1
+  oscillation_omega_eps: 0.1
+  oscillation_recovery_min_duration: 10
+  oscillation_filter_duration: 10

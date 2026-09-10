@@ -14,7 +14,7 @@ import tf.transformations
 from geometry_msgs.msg import Pose, Point, Quaternion
 from nav_msgs.msg import Odometry
 
-cur_odom_to_baselink = None
+cur_odom_to_baselink = None  # 实际上是odom到body
 cur_map_to_odom = None
 data_lock = threading.Lock()
 
@@ -44,7 +44,7 @@ def transform_fusion():
 
         br.sendTransform(tf.transformations.translation_from_matrix(T_map_to_odom),
                          tf.transformations.quaternion_from_matrix(T_map_to_odom),
-                         rospy.Time.now(),
+                         rospy.Time.now() + rospy.Duration(0.04),
                          'odom', 'map')
         if cur_odom is not None:
             # 发布全局定位的odometry

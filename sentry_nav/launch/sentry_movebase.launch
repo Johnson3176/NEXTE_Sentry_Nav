@@ -3,14 +3,20 @@
         <!-- <remap from="/cmd_vel" to="/raw_cmd_vel" /> -->
         <param name="recovery_behavior_enabled" value="false" />
 
-        <param name="base_global_planner" value="hybrid_astar_planner/HybridAStarPlanner" />
-        <param name="use_hybrid_astar" value="true" />
+        <param name="base_local_planner" value="teb_local_planner/TebLocalPlannerROS"/>
+        <!-- <param name="base_local_planner" value="dwa_local_planner/DwaLocalPlannerROS"/> -->
+        <!-- <param name="base_global_planner" value="hybrid_astar_planner/HybridAStarPlanner" />
+        <param name="use_hybrid_astar" value="true" /> -->
+        <param name="base_global_planner" value="global_planner/GlobalPlanner" />
         <rosparam file="$(find sentry_nav)/param/costmap_common_params.yaml" command="load" ns="global_costmap" />
         <rosparam file="$(find sentry_nav)/param/costmap_common_params.yaml" command="load" ns="local_costmap" />
         <rosparam file="$(find sentry_nav)/param/local_costmap_params.yaml" command="load" />
         <rosparam file="$(find sentry_nav)/param/global_costmap_params.yaml" command="load" />
         <rosparam file="$(find sentry_nav)/param/base_teb_local_planner_params.yaml" command="load" />
-        <!-- <rosparam file="$(find sentry_nav)/param/global_planner_params.yaml" command="load" /> -->
+        <!-- <rosparam file="$(find sentry_nav)/param/teb_old.yaml" command="load" /> -->
+        <!-- <rosparam file="$(find sentry_nav)/param/base_dwa_local_planner_params.yaml" command="load" /> -->
+        <!-- <rosparam file="$(find sentry_nav)/param/costmap_converter_params.yaml" command="load" /> -->
+        <rosparam file="$(find sentry_nav)/param/global_planner_params.yaml" command="load" />
     </node>
 
     <node pkg="sentry_nav" type="trans_tf_2d" name="trans_tF_2d" />

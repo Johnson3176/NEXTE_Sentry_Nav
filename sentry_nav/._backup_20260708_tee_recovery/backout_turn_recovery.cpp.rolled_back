@@ -1,0 +1,340 @@
+#include <algorithm>
+#include <cmath>
+#include <string>
+
+#include <costmap_2d/costmap_2d.h>
+#include <costmap_2d/costmap_2d_ros.h>
+#include <geometry_msgs/PoseStamped.h>
+#include <geometry_msgs/Twist.h>
+#include <nav_core/recovery_behavior.h>
+#include <pluginlib/class_list_macros.h>
+#include <ros/ros.h>
+#include <tf2/utils.h>
+#include <tf2_ros/buffer.h>
+
+namespace sentry_nav
+{
+
+class BackoutTurnRecovery : public nav_core::RecoveryBehavior
+{
+public:
+  BackoutTurnRecovery() = default;
+
+  void initialize(std::string name, tf2_ros::Buffer* tf,
+                  costmap_2d::Costmap2DROS* global_costmap,
+                  costmap_2d::Costmap2DROS* local_costmap) override
+  {
+    if (initialized_)
+    {
+      return;
+    }
+
+    name_ = name;
+    tf_ = tf;
+    global_costmap_ = global_costmap;
+    local_costmap_ = local_costmap;
+
+    ros::NodeHandle nh;
+    ros::NodeHandle private_nh("~/" + name);
+
+    private_nh.param("backup_distance", backup_distance_, 0.45);
+    private_nh.param("backup_speed", backup_speed_, 0.15);
+    private_nh.param("turn_angle", turn_angle_, 1.05);
+    private_nh.param("turn_speed", turn_speed_, 0.65);
+    private_nh.param("sim_frequency", sim_frequency_, 10.0);
+    private_nh.param("rear_check_width", rear_check_width_, 0.50);
+    private_nh.param("rear_check_padding", rear_check_padding_, 0.12);
+    private_nh.param("side_check_distance", side_check_distance_, 0.85);
+    private_nh.param("max_recovery_duration", max_recovery_duration_, 8.0);
+    private_nh.param("cost_threshold", cost_threshold_, static_cast<int>(costmap_2d::INSCRIBED_INFLATED_OBSTACLE));
+    private_nh.param<std::string>("cmd_vel_topic", cmd_vel_topic_, "cmd_vel");
+
+    backup_speed_ = std::fabs(backup_speed_);
+    turn_speed_ = std::fabs(turn_speed_);
+    backup_distance_ = std::max(0.0, backup_distance_);
+    turn_angle_ = std::max(0.0, turn_angle_);
+    sim_frequency_ = std::max(1.0, sim_frequency_);
+
+    cmd_vel_pub_ = nh.advertise<geometry_msgs::Twist>(cmd_vel_topic_, 1);
+    initialized_ = true;
+  }
+
+  void runBehavior() override
+  {
+    if (!initialized_ || local_costmap_ == nullptr)
+    {
+      ROS_ERROR("BackoutTurnRecovery is not initialized.");
+      return;
+    }
+
+    ROS_WARN("BackoutTurnRecovery: start backup-turn recovery.");
+
+    const ros::Time start_time = ros::Time::now();
+    const int turn_direction = chooseTurnDirection();
+    runBackup(start_time);
+    publishStop();
+    ros::Duration(0.2).sleep();
+    runTurn(turn_direction, start_time);
+    publishStop();
+
+    ROS_WARN("BackoutTurnRecovery: finished, handing control back to move_base.");
+  }
+
+private:
+  bool getRobotPose(geometry_msgs::PoseStamped& pose) const
+  {
+    return local_costmap_ && local_costmap_->getRobotPose(pose);
+  }
+
+  double poseDistance(const geometry_msgs::PoseStamped& a, const geometry_msgs::PoseStamped& b) const
+  {
+    const double dx = a.pose.position.x - b.pose.position.x;
+    const double dy = a.pose.position.y - b.pose.position.y;
+    return std::hypot(dx, dy);
+  }
+
+  double shortestAngularDistance(double from, double to) const
+  {
+    double diff = std::fmod(to - from + M_PI, 2.0 * M_PI);
+    if (diff < 0.0)
+    {
+      diff += 2.0 * M_PI;
+    }
+    return diff - M_PI;
+  }
+
+  bool isBodyPointSafe(double body_x, double body_y, unsigned char* observed_cost = nullptr) const
+  {
+    geometry_msgs::PoseStamped pose;
+    if (!getRobotPose(pose))
+    {
+      return false;
+    }
+
+    const double yaw = tf2::getYaw(pose.pose.orientation);
+    const double wx = pose.pose.position.x + std::cos(yaw) * body_x - std::sin(yaw) * body_y;
+    const double wy = pose.pose.position.y + std::sin(yaw) * body_x + std::cos(yaw) * body_y;
+
+    costmap_2d::Costmap2D* costmap = local_costmap_->getCostmap();
+    unsigned int mx = 0;
+    unsigned int my = 0;
+    if (!costmap || !costmap->worldToMap(wx, wy, mx, my))
+    {
+      return false;
+    }
+
+    const unsigned char cost = costmap->getCost(mx, my);
+    if (observed_cost)
+    {
+      *observed_cost = cost;
+    }
+
+    return cost != costmap_2d::NO_INFORMATION && cost < static_cast<unsigned char>(cost_threshold_);
+  }
+
+  bool rearIsSafe() const
+  {
+    const double end_x = -(backup_distance_ + rear_check_padding_);
+    for (double x = -rear_check_padding_; x >= end_x; x -= 0.10)
+    {
+      for (double y = -rear_check_width_; y <= rear_check_width_; y += 0.10)
+      {
+        if (!isBodyPointSafe(x, y))
+        {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  bool turnSideIsSafe(int direction) const
+  {
+    const double side = direction >= 0 ? 1.0 : -1.0;
+    for (double x = -0.55; x <= 0.55; x += 0.15)
+    {
+      for (double y = 0.45; y <= side_check_distance_; y += 0.10)
+      {
+        if (!isBodyPointSafe(x, side * y))
+        {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  double scoreDirection(int direction) const
+  {
+    double score = 0.0;
+    const double side = direction >= 0 ? 1.0 : -1.0;
+    const double angles[] = {0.35, 0.60, 0.85, 1.10};
+    const double ranges[] = {0.55, 0.80, 1.05, 1.30};
+
+    for (double angle : angles)
+    {
+      for (double range : ranges)
+      {
+        const double x = range * std::cos(angle);
+        const double y = side * range * std::sin(angle);
+        unsigned char cost = costmap_2d::LETHAL_OBSTACLE;
+        if (!isBodyPointSafe(x, y, &cost))
+        {
+          score += 1000.0;
+        }
+        else
+        {
+          score += static_cast<double>(cost);
+        }
+      }
+    }
+
+    return score;
+  }
+
+  int chooseTurnDirection() const
+  {
+    const double left_score = scoreDirection(1);
+    const double right_score = scoreDirection(-1);
+    const int direction = left_score <= right_score ? 1 : -1;
+    ROS_WARN("BackoutTurnRecovery: left_score=%.1f right_score=%.1f choose=%s",
+             left_score, right_score, direction > 0 ? "left" : "right");
+    return direction;
+  }
+
+  bool timeRemaining(const ros::Time& start_time) const
+  {
+    return (ros::Time::now() - start_time).toSec() < max_recovery_duration_;
+  }
+
+  void runBackup(const ros::Time& recovery_start)
+  {
+    if (backup_distance_ <= 0.0 || backup_speed_ <= 0.0)
+    {
+      return;
+    }
+
+    if (!rearIsSafe())
+    {
+      ROS_WARN("BackoutTurnRecovery: rear area is not safe, skip backup.");
+      return;
+    }
+
+    geometry_msgs::PoseStamped start_pose;
+    if (!getRobotPose(start_pose))
+    {
+      ROS_WARN("BackoutTurnRecovery: cannot get robot pose, skip backup.");
+      return;
+    }
+
+    ros::Rate rate(sim_frequency_);
+    while (ros::ok() && timeRemaining(recovery_start))
+    {
+      geometry_msgs::PoseStamped current_pose;
+      if (!getRobotPose(current_pose) || poseDistance(start_pose, current_pose) >= backup_distance_)
+      {
+        break;
+      }
+
+      if (!rearIsSafe())
+      {
+        ROS_WARN("BackoutTurnRecovery: rear became unsafe, stop backup.");
+        break;
+      }
+
+      geometry_msgs::Twist cmd;
+      cmd.linear.x = -backup_speed_;
+      cmd_vel_pub_.publish(cmd);
+      rate.sleep();
+    }
+  }
+
+  void runTurn(int direction, const ros::Time& recovery_start)
+  {
+    if (turn_angle_ <= 0.0 || turn_speed_ <= 0.0)
+    {
+      return;
+    }
+
+    if (!turnSideIsSafe(direction))
+    {
+      ROS_WARN("BackoutTurnRecovery: chosen turn side is not safe, try opposite side.");
+      direction *= -1;
+    }
+
+    if (!turnSideIsSafe(direction))
+    {
+      ROS_WARN("BackoutTurnRecovery: both turn sides are unsafe, skip turn.");
+      return;
+    }
+
+    geometry_msgs::PoseStamped start_pose;
+    if (!getRobotPose(start_pose))
+    {
+      ROS_WARN("BackoutTurnRecovery: cannot get robot pose, skip turn.");
+      return;
+    }
+
+    const double start_yaw = tf2::getYaw(start_pose.pose.orientation);
+    ros::Rate rate(sim_frequency_);
+    while (ros::ok() && timeRemaining(recovery_start))
+    {
+      geometry_msgs::PoseStamped current_pose;
+      if (!getRobotPose(current_pose))
+      {
+        break;
+      }
+
+      const double current_yaw = tf2::getYaw(current_pose.pose.orientation);
+      const double turned = std::fabs(shortestAngularDistance(start_yaw, current_yaw));
+      if (turned >= turn_angle_)
+      {
+        break;
+      }
+
+      if (!turnSideIsSafe(direction))
+      {
+        ROS_WARN("BackoutTurnRecovery: turn side became unsafe, stop turn.");
+        break;
+      }
+
+      geometry_msgs::Twist cmd;
+      cmd.angular.z = direction * turn_speed_;
+      cmd_vel_pub_.publish(cmd);
+      rate.sleep();
+    }
+  }
+
+  void publishStop()
+  {
+    geometry_msgs::Twist cmd;
+    for (int i = 0; i < 3; ++i)
+    {
+      cmd_vel_pub_.publish(cmd);
+      ros::Duration(0.05).sleep();
+    }
+  }
+
+  bool initialized_ = false;
+  std::string name_;
+  tf2_ros::Buffer* tf_ = nullptr;
+  costmap_2d::Costmap2DROS* global_costmap_ = nullptr;
+  costmap_2d::Costmap2DROS* local_costmap_ = nullptr;
+  ros::Publisher cmd_vel_pub_;
+
+  std::string cmd_vel_topic_;
+  double backup_distance_ = 0.45;
+  double backup_speed_ = 0.15;
+  double turn_angle_ = 1.05;
+  double turn_speed_ = 0.65;
+  double sim_frequency_ = 10.0;
+  double rear_check_width_ = 0.50;
+  double rear_check_padding_ = 0.12;
+  double side_check_distance_ = 0.85;
+  double max_recovery_duration_ = 8.0;
+  int cost_threshold_ = costmap_2d::INSCRIBED_INFLATED_OBSTACLE;
+};
+
+}  // namespace sentry_nav
+
+PLUGINLIB_EXPORT_CLASS(sentry_nav::BackoutTurnRecovery, nav_core::RecoveryBehavior)

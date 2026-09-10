@@ -1,0 +1,9 @@
+<library path="lib/libbackout_turn_recovery">
+  <class name="sentry_nav/BackoutTurnRecovery"
+         type="sentry_nav::BackoutTurnRecovery"
+         base_class_type="nav_core::RecoveryBehavior">
+    <description>
+      Back up from a close obstacle, rotate toward the safer side, and hand control back to move_base.
+    </description>
+  </class>
+</library>

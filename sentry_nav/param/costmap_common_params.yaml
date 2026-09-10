@@ -1,12 +1,55 @@
 #机器人几何参，如果机器人是圆形，设置 robot_radius,如果是其他形状设置 footprint
 # robot_radius: 0.40 #圆形
-footprint: [[0.5, 0.4], [-0.5, 0.4], [-0.5, -0.4], [0.5, -0.4]] #其他形状
-footprint_padding: 0.02 # 机器人边界的额外安全距离，单位为米。这个值会在计算代价地图时添加到机器人的实际尺寸上，以提供额外的安全缓冲区，帮助机器人更安全地避开障碍物。
+footprint: [[0.5, 0.4], [-0.5, 0.4], [-0.5, -0.4], [0.5, -0.4]]
+footprint_padding: 0.02
+map_type: costmap
+
+# # ============================================
+# # 2. obstacle_layer（处理传感器和障碍物清除）
+# # ============================================
+# obstacle_layer:
+#   enabled: true
+#   obstacle_range: 3.0                # ← 检测范围
+#   raytrace_range: 5.0                # ← 清除范围（必须 >= obstacle_range）
+#   clearing: true                     # ← 启用清除功能
+#   clearing_interval: 1               # ← 每次更新都执行清除
+#   observation_persistence: 0.0       # ← 新增！不记忆历史障碍物（消除残影关键）
+#   track_unknown_space: true          # ← 新增！保留未知区域
+#   max_obstacle_height: 2.0
+#   observation_sources: scan
+  
+#   scan:
+#     sensor_frame: body_2d
+#     data_type: LaserScan
+#     topic: /scan
+#     marking: true                    # 标记障碍物
+#     clearing: true                   # 清除空闲区域
+#     obstacle_range: 3.0              # 该传感器的独立检测范围（可选）
+#     raytrace_range: 5.0              # 该传感器的独立清除范围（可选）
+      
+# # ============================================
+# # 3. inflation_layer（处理膨胀）
+# # ============================================
+# inflation_layer:
+#   enabled: true
+#   inflation_radius: 0.5              # ← 膨胀半径
+#   cost_scaling_factor: 2.0           # ← 代价缩放因子
+
+# # ============================================
+# # 4. static_layer（全局地图的静态层，局部地图可选）
+# # ============================================
+# static_layer:
+#   enabled: true
+#   map_topic: /map
+#   subscribe_to_updates: false
+
 
 obstacle_range: 3.0 # 用于障碍物探测，比如: 值为 3.0，意味着检测到距离小于 3 米的障碍物时，就会引入代价地图
-raytrace_range: 3.0 # 用于清除障碍物，比如：值为 3.5，意味着清除代价地图中 3.5 米以外的障碍物
- 
- 
+raytrace_range: 5.0 # 用于清除障碍物，比如：值为 3.5，意味着清除代价地图中 3.5 米以外的障碍物
+
+
+clearing: true                    
+clearing_interval: 1              
 #膨胀半径，扩展在碰撞区域以外的代价区域，使得机器人规划路径避开障碍物
 inflation_radius: 0.5
 #代价比例系数，越大则代价值越小
@@ -18,4 +61,4 @@ map_type: costmap
 observation_sources: scan
 #对传感器的坐标系和数据进行配置。这个也会用于代价地图添加和清除障碍物。例如，你可以用激光雷达传感器用于在代价地图添加障碍物，再添加kinect用于导航和清除障碍物。
 #sensor_frame should be your own frame in tftree
-scan: {sensor_frame: body_2d, data_type: LaserScan, topic: /scan, marking: true, clearing: true}
+scan: {sensor_frame: body_2d, data_type: LaserScan, topic: /scan, marking: true, clearing: true, inf_is_valid: true}
