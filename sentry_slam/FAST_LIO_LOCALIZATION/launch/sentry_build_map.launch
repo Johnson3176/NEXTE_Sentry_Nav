@@ -6,7 +6,7 @@
 	<arg name="map" default="$(find fast_lio)/PCD/scans.pcd" />
 
 	<!-- fast_lio -->
-	<rosparam command="load" file="$(find fast_lio)/config/mid360.yaml" />
+	<rosparam command="load" file="$(find fast_lio)/config/mid360_mapping.yaml" />
 	<param name="feature_extract_enable" type="bool" value="0"/>
 	<param name="point_filter_num" type="int" value="3"/>
 	<param name="max_iteration" type="int" value="3" />

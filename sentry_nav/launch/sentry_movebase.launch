@@ -1,6 +1,6 @@
 <launch>
     <node pkg="move_base" type="move_base" respawn="false" name="move_base1" output="screen" clear_params="true" args="/map:=prior_map /odom:=Odometry">
-        <!-- <remap from="/cmd_vel" to="/raw_cmd_vel" /> -->
+        <remap from="/cmd_vel" to="/raw_cmd_vel" />
         <param name="recovery_behavior_enabled" value="false" />
 
         <param name="base_local_planner" value="teb_local_planner/TebLocalPlannerROS"/>

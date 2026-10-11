@@ -82,7 +82,7 @@ mutex mtx_buffer;
 condition_variable sig_buffer;
 
 string root_dir = ROOT_DIR;
-string map_file_path, lid_topic, imu_topic;
+string map_file_path, lid_topic, imu_topic, lid_local_frames_topic;
 
 double res_mean_last = 0.05, total_residual = 0.0;
 double last_timestamp_lidar = 0, last_timestamp_imu = -1.0;
@@ -94,6 +94,8 @@ int    iterCount = 0, feats_down_size = 0, NUM_MAX_ITERATIONS = 0, laserCloudVal
 bool   point_selected_surf[100000] = {0};
 bool   lidar_pushed, flg_first_scan = true, flg_exit = false, flg_EKF_inited;
 bool   scan_pub_en = false, dense_pub_en = false, scan_body_pub_en = false;
+int    localframes_max_frames = 15;
+double localframes_min_distance = 0.03;
 
 vector<vector<int>>  pointSearchInd_surf; 
 vector<BoxPointType> cub_needrm;
@@ -524,6 +526,53 @@ void publish_frame_world(const ros::Publisher & pubLaserCloudFull)
     }
 }
 
+void publish_frame_world_localframes(const ros::Publisher & pubLaserCloudAccumulated)
+{
+    if (!scan_pub_en) return;
+
+    static deque<PointCloudXYZI::Ptr> recent_frames;
+    static bool has_last_position = false;
+    static V3D last_accumulated_position(Zero3d);
+
+    V3D current_position(
+        odomAftMapped.pose.pose.position.x,
+        odomAftMapped.pose.pose.position.y,
+        odomAftMapped.pose.pose.position.z);
+
+    PointCloudXYZI::Ptr laserCloudFullRes(dense_pub_en ? feats_undistort : feats_down_body);
+    PointCloudXYZI::Ptr laserCloudWorld(new PointCloudXYZI(laserCloudFullRes->size(), 1));
+    for (size_t i = 0; i < laserCloudFullRes->size(); ++i)
+    {
+        RGBpointBodyToWorld(&laserCloudFullRes->points[i], &laserCloudWorld->points[i]);
+    }
+    cout<< "recent_frames.size(): " << recent_frames.size() << endl;
+    cout<< "localframes_max_frames: " << localframes_max_frames << endl;
+    if (recent_frames.size() < static_cast<size_t>(localframes_max_frames) / 2 || 
+        (current_position - last_accumulated_position).norm() > localframes_min_distance)
+    {
+        recent_frames.push_back(laserCloudWorld);
+        last_accumulated_position = current_position;
+    }
+    if (recent_frames.size() > static_cast<size_t>(localframes_max_frames))
+    {
+        recent_frames.pop_front();
+    }
+    
+    has_last_position = true;
+
+    PointCloudXYZI accumulated_cloud;
+    for (const PointCloudXYZI::Ptr &frame : recent_frames)
+    {
+        accumulated_cloud += *frame;
+    }
+
+    sensor_msgs::PointCloud2 accumulated_msg;
+    pcl::toROSMsg(accumulated_cloud, accumulated_msg);
+    accumulated_msg.header.stamp = ros::Time().fromSec(lidar_end_time);
+    accumulated_msg.header.frame_id = "odom";
+    pubLaserCloudAccumulated.publish(accumulated_msg);
+}
+
 void publish_frame_body(const ros::Publisher & pubLaserCloudFull_body)
 {
     int size = feats_undistort->points.size();
@@ -758,10 +807,15 @@ int main(int argc, char** argv)
     nh.param<bool>("publish/scan_publish_en",scan_pub_en, true);
     nh.param<bool>("publish/dense_publish_en",dense_pub_en, true);
     nh.param<bool>("publish/scan_bodyframe_pub_en",scan_body_pub_en, true);
+    nh.param<int>("publish/localframes_max_frames", localframes_max_frames, 15);
+    nh.param<double>("publish/localframes_min_distance", localframes_min_distance, 0.03);
+    localframes_max_frames = max(1, localframes_max_frames);
+    localframes_min_distance = max(0.0, localframes_min_distance);
     nh.param<int>("max_iteration",NUM_MAX_ITERATIONS,4);
     nh.param<string>("map_file_path",map_file_path,"");
     nh.param<string>("common/lid_topic",lid_topic,"/livox/lidar");
     nh.param<string>("common/imu_topic", imu_topic,"/livox/imu");
+    nh.param<string>("common/lid_local_frames_topic",lid_local_frames_topic,"/livox/local_frames");
     nh.param<bool>("common/time_sync_en", time_sync_en, false);
     nh.param<double>("common/time_offset_lidar_to_imu", time_diff_lidar_to_imu, 0.0);
     nh.param<double>("filter_size_corner",filter_size_corner_min,0.5);
@@ -842,6 +896,8 @@ int main(int argc, char** argv)
     ros::Subscriber sub_imu = nh.subscribe(imu_topic, 200000, imu_cbk);
     ros::Publisher pubLaserCloudFull = nh.advertise<sensor_msgs::PointCloud2>
             ("/cloud_registered", 100000);
+    ros::Publisher pubLaserCloudAccumulated = nh.advertise<sensor_msgs::PointCloud2>
+            (lid_local_frames_topic, 100000);
     ros::Publisher pubLaserCloudFull_body = nh.advertise<sensor_msgs::PointCloud2>
             ("/cloud_registered_body", 100000);
     ros::Publisher pubLaserCloudEffect = nh.advertise<sensor_msgs::PointCloud2>
@@ -973,6 +1029,7 @@ int main(int argc, char** argv)
             /******* Publish points *******/
             if (path_en)                         publish_path(pubPath);
             if (scan_pub_en || pcd_save_en)      publish_frame_world(pubLaserCloudFull);
+            if (scan_pub_en)                     publish_frame_world_localframes(pubLaserCloudAccumulated);
             if (scan_pub_en && scan_body_pub_en) publish_frame_body(pubLaserCloudFull_body);
             // publish_effect_world(pubLaserCloudEffect);
             // publish_map(pubLaserCloudMap);
