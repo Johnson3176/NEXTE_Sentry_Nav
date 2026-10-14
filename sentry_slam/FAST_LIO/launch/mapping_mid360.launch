@@ -4,7 +4,7 @@
 	<arg name="rviz" default="true" />
 	<arg name="use_sim_time" value="true"/>
 
-	<rosparam command="load" file="$(find fast_lio)/config/mid360.yaml" />
+	<rosparam command="load" file="$(find fast_lio)/config/mid360_localize.yaml" />
 
 	<param name="feature_extract_enable" type="bool" value="0"/>
 	<param name="point_filter_num" type="int" value="3"/>

@@ -109,7 +109,7 @@ void Preprocess::avia_handler(const livox_ros_driver2::CustomMsg::ConstPtr &msg)
   {
     for(uint i=1; i<plsize; i++)
     {
-      if(msg->points[i].x < 1.0 && msg->points[i].x > -1.5 && msg->points[i].y < 0.8 && msg->points[i].y > -0.8 && msg->points[i].z < 1.5 && msg->points[i].z > -0.5)
+      if(msg->points[i].x < 0.1 && msg->points[i].x > -1.0 && msg->points[i].y < 0.5 && msg->points[i].y > -0.5 && msg->points[i].z < 2.0 && msg->points[i].z > -0.5)
         continue;
       if((msg->points[i].line < N_SCANS) && ((msg->points[i].tag & 0x30) == 0x10 || (msg->points[i].tag & 0x30) == 0x00))
       {
@@ -160,7 +160,9 @@ void Preprocess::avia_handler(const livox_ros_driver2::CustomMsg::ConstPtr &msg)
   {
     for(uint i=1; i<plsize; i++)
     {
-      if(msg->points[i].x < 1.0 && msg->points[i].x > -1.5 && msg->points[i].y < 0.8 && msg->points[i].y > -0.8 && msg->points[i].z < 1.5 && msg->points[i].z > -0.5)
+      // if(msg->points[i].x < 1.0 && msg->points[i].x > -1.5 && msg->points[i].y < 0.8 && msg->points[i].y > -0.8 && msg->points[i].z < 1.5 && msg->points[i].z > -0.5)
+      //   continue;
+      if(msg->points[i].x < 0.1 && msg->points[i].x > -1.0 && msg->points[i].y < 0.5 && msg->points[i].y > -0.5 && msg->points[i].z < 2.0 && msg->points[i].z > -0.5)
         continue;
       if((msg->points[i].line < N_SCANS) && ((msg->points[i].tag & 0x30) == 0x10 || (msg->points[i].tag & 0x30) == 0x00))
       {
